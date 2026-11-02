@@ -1,0 +1,163 @@
+### Запросы к демо-проекту урока 8.
+### Открываются в PyCharm (HTTP Client) и VS Code (расширение REST Client):
+### у каждого запроса появляется кнопка «Run» / «Send Request».
+###
+### Перед запуском: python manage.py seed_demo && python manage.py runserver
+### Токены вставьте в переменные ниже после первых запросов.
+
+@base = http://127.0.0.1:8000
+@token = вставьте_сюда_token_из_ответа_login
+@access = вставьте_сюда_access_из_ответа_token
+@refresh = вставьте_сюда_refresh_из_ответа_token
+
+
+############################################################ 1. Аутентификация
+
+### Аноним: 401 Unauthorized
+GET {{base}}/api/auth/me/
+
+### Token: готовый obtain_auth_token
+POST {{base}}/api/auth/obtain-token/
+Content-Type: application/json
+
+{"username": "john", "password": "secret123"}
+
+### Token: свой custom_login — токен и данные пользователя
+POST {{base}}/api/auth/login/
+Content-Type: application/json
+
+{"username": "john", "password": "secret123"}
+
+### Запрос с DRF-токеном
+GET {{base}}/api/auth/me/
+Authorization: Token {{token}}
+
+### JWT: пара access + refresh
+POST {{base}}/api/auth/token/
+Content-Type: application/json
+
+{"username": "john", "password": "secret123"}
+
+### Запрос с JWT
+GET {{base}}/api/auth/me/
+Authorization: Bearer {{access}}
+
+### JWT: обновить access (вернётся и новый refresh)
+POST {{base}}/api/auth/token/refresh/
+Content-Type: application/json
+
+{"refresh": "{{refresh}}"}
+
+### JWT: выход — refresh в чёрный список
+POST {{base}}/api/auth/token/blacklist/
+Content-Type: application/json
+
+{"refresh": "{{refresh}}"}
+
+### Token: выход — токен удаляется
+POST {{base}}/api/auth/logout/
+Authorization: Token {{token}}
+
+
+############################################################ 2. Права доступа
+
+### Создать статью (нужен вход и подтверждённый email)
+POST {{base}}/api/articles/
+Authorization: Token {{token}}
+Content-Type: application/json
+
+{"title": "Новая статья", "content": "Текст статьи"}
+
+### Изменить статью: только автор (IsAuthorOrReadOnly)
+PATCH {{base}}/api/articles/1/
+Authorization: Token {{token}}
+Content-Type: application/json
+
+{"title": "Новый заголовок"}
+
+### Опубликовать: @action publish
+POST {{base}}/api/articles/1/publish/
+Authorization: Token {{token}}
+
+### Статьи на проверке: только admin (IsAdminUser)
+GET {{base}}/api/articles/pending_review/
+Authorization: Token {{token}}
+
+
+############################################################ 3. Фильтрация, поиск, сортировка
+
+### Фильтр по автору и статусу
+GET {{base}}/api/articles/?author=2&published=true
+
+### Часть заголовка без учёта регистра
+GET {{base}}/api/articles/?title=django
+
+### Диапазон дат
+GET {{base}}/api/articles/?created_after=2024-06-01&created_before=2024-12-31
+
+### Несколько авторов: повтор параметра
+GET {{base}}/api/articles/?authors=2&authors=3
+
+### Несколько авторов: через запятую
+GET {{base}}/api/articles/?author_in=2,3
+
+### Поиск по заголовку, тексту и автору
+GET {{base}}/api/articles/?search=python
+
+### Сортировка
+GET {{base}}/api/articles/?ordering=title
+
+### Всё вместе
+GET {{base}}/api/articles/?search=django&published=true&ordering=-created_at
+
+
+############################################################ 4. Пагинация
+
+### Номера страниц
+GET {{base}}/api/articles/?page=2&page_size=5
+
+### limit / offset
+GET {{base}}/api/comments/?limit=3&offset=5
+
+### Курсор: дальше — по ссылке next из ответа
+GET {{base}}/api/feed/
+
+
+############################################################ 5. Вложенные сериализаторы
+
+### Статья с комментариями, их числом и вложениями
+GET {{base}}/api/articles/2/
+
+### Комментарии с Meta.depth = 1
+GET {{base}}/api/comments/?limit=2
+
+
+############################################################ 6. Файлы
+
+### Загрузить обложку (путь к картинке — относительно этого файла)
+POST {{base}}/api/articles/1/upload_cover/
+Authorization: Token {{token}}
+Content-Type: multipart/form-data; boundary=lesson8
+
+--lesson8
+Content-Disposition: form-data; name="cover_image"; filename="cover.png"
+Content-Type: image/png
+
+< ./cover.png
+--lesson8--
+
+### Прикрепить файл
+POST {{base}}/api/articles/1/add_attachment/
+Authorization: Token {{token}}
+Content-Type: multipart/form-data; boundary=lesson8
+
+--lesson8
+Content-Disposition: form-data; name="filename"
+
+Конспект урока.txt
+--lesson8
+Content-Disposition: form-data; name="file"; filename="notes.txt"
+Content-Type: text/plain
+
+< ./notes.txt
+--lesson8--
